@@ -21,7 +21,7 @@ This directory holds two packages:
 ```yaml
 # pubspec.yaml
 dependencies:
-  forge_ops_tracker: ^0.17.1
+  forge_ops_tracker: ^0.18.0
   # Flutter apps only:
   flutter_forge_ops_tracker: ^0.2.0
 ```
@@ -574,7 +574,7 @@ forge_ops_tracker.init((config) {
 
 - An error event goes out without its message. It carries a `message_fingerprint` instead: a
   one-way hash of the message (as it would have been sent, so after PII scrubbing) with its
-  numbers and ids taken out, computed in this process, so errors still group the same way.
+  numbers, ids, emails and quoted values taken out, computed in this process, so errors still group the same way.
 - No breadcrumbs (`addBreadcrumb` records nothing), no SQL statement (even with
   `captureSqlStatement` on; the table and view names are still sent), and no source context.
 - The user is sent as its `id` only, never `email` or `username`.

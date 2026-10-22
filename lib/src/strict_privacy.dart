@@ -8,7 +8,7 @@
 /// `sdks/strict_privacy_vectors.json` pins the results both have to agree on.
 ///
 /// Errors still group without their message: `message_fingerprint` is a one-way hash of the message
-/// with its numbers and ids taken out, computed here, in this process. The SHA-256 below is
+/// with its numbers, ids, emails and quoted values taken out, computed here, in this process. The SHA-256 below is
 /// self-contained, since this package has no dependencies (`package:crypto` included).
 library;
 
@@ -18,6 +18,11 @@ const int fingerprintLength = 32;
 
 // ASCII "word" characters only, spelled out rather than \w so no engine's own idea of a word
 // changes the result: the same in every SDK and on the server.
+final RegExp _email = RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
+// A quoted value (KeyError: 'Jane Doe') is data, not the shape of the error. Single quotes only open
+// and close at a word boundary, so a contraction (Couldn't) or the `email' style never starts one.
+final RegExp _doubleQuoted = RegExp(r'"[^"\r\n]*"');
+final RegExp _singleQuoted = RegExp(r"(?<![A-Za-z0-9_])'[^'\r\n]*'(?![A-Za-z0-9_])");
 final RegExp _hexObjectId = RegExp(r'0x[0-9a-fA-F]{4,}');
 final RegExp _uuid = RegExp(
     r'(?<![A-Za-z0-9_])[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![A-Za-z0-9_])');
@@ -37,9 +42,15 @@ const List<String> _spanDataKeys = ['db.statement', 'db.system'];
 const List<String> _droppedEventFields = ['message', 'breadcrumbs', 'sql_statement', 'endpoint', 'context', 'tags', 'user'];
 const List<String> _sourceContextFields = ['context_line', 'pre_context', 'post_context'];
 
-/// The message with hex object ids, UUIDs and standalone numbers replaced, in that order.
-String normalizeMessage(String? message) =>
-    (message ?? '').replaceAll(_hexObjectId, '0x').replaceAll(_uuid, '<uuid>').replaceAll(_number, '<n>');
+/// The message with emails, quoted values, hex object ids, UUIDs and standalone numbers replaced, in
+/// that order.
+String normalizeMessage(String? message) => (message ?? '')
+    .replaceAll(_email, '<email>')
+    .replaceAll(_doubleQuoted, '<str>')
+    .replaceAll(_singleQuoted, '<str>')
+    .replaceAll(_hexObjectId, '0x')
+    .replaceAll(_uuid, '<uuid>')
+    .replaceAll(_number, '<n>');
 
 /// First 32 hex characters of the SHA-256 of the normalized message's UTF-8 bytes.
 String messageFingerprint(String? message) =>
