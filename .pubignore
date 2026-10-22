@@ -1,0 +1,12 @@
+# What `dart pub publish` leaves out of the forge_ops_tracker package. A .pubignore replaces this
+# directory's .gitignore for publishing (pub reads one or the other, not both), so the .gitignore
+# rules are repeated here.
+.dart_tool/
+.packages
+build/
+pubspec.lock
+lib/.forge_ops_tracker_test_tmp_*/
+
+# The Flutter companion package lives alongside this one but is published on its own, as
+# flutter_forge_ops_tracker; without this line every forge_ops_tracker release carried a copy of it.
+flutter_forge_ops_tracker/

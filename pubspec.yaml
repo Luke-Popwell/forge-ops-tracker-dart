@@ -1,0 +1,36 @@
+name: forge_ops_tracker
+version: 0.17.0
+description: >
+  Dart error reporting client for ForgeOps. Works in
+  any Dart VM environment (server apps, CLI tools, Flutter mobile/desktop): see README.md for
+  why Flutter Web specifically isn't covered, and for the separate flutter_forge_ops_tracker
+  package that adds Flutter-specific automatic capture on top of this one.
+homepage: https://getforgeops.net
+repository: https://github.com/Luke-Popwell/forge-ops-tracker-dart
+topics:
+  - error-reporting
+  - logging
+  - monitoring
+  - observability
+
+# test/pii_scrubber_test.dart contains a fake AWS-shaped access key as fixture data for testing
+# the PII scrubber's own AWS-key detection: not a real credential, but `dart pub publish`'s
+# secret scanner has no way to tell the difference from the string alone.
+false_secrets:
+  - test/pii_scrubber_test.dart
+
+environment:
+  # >=3.2.0 rather than the earlier ^3.0.0: source context capture (see EventBuilder's
+  # _resolveFilePath) needs Isolate.resolvePackageUriSync, added in 3.2.0: the async
+  # Isolate.resolvePackageUri existed earlier, but a synchronous call is the only way to resolve a
+  # package: location without threading async through the whole best-effort attach-context path.
+  sdk: ">=3.2.0 <4.0.0"
+
+# Zero runtime dependencies: dart:io's HttpClient and dart:convert's jsonEncode cover HTTP
+# delivery and JSON encoding, the same "reach for the language's own standard library first"
+# choice every other client in this repo makes where its language's stdlib actually has the
+# needed piece (see README.md's "Dependencies" section for the one real platform limitation this
+# choice implies).
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^4.0.0

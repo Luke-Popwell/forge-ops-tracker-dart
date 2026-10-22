@@ -1,0 +1,10 @@
+.dart_tool/
+.packages
+build/
+pubspec.lock
+
+# Real temp files event_builder_test.dart's source-context tests write under lib/ (package: URI
+# resolution only ever resolves against the package's own lib/, so this is the only way to test
+# against a real, disk-resolved package: location): test tearDown always deletes these, this is
+# only a safety net if a test run is interrupted before cleanup runs.
+lib/.forge_ops_tracker_test_tmp_*/

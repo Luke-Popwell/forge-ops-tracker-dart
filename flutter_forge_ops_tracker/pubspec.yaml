@@ -1,0 +1,33 @@
+name: flutter_forge_ops_tracker
+version: 0.2.1
+description: >
+  Flutter-specific automatic error capture on top of package:forge_ops_tracker: FlutterError.onError
+  and PlatformDispatcher.instance.onError. A separate package, not folded into
+  forge_ops_tracker itself, specifically so a plain Dart (non-Flutter) consumer of that package
+  never has to pull in the Flutter SDK. See ../README.md's "Dependencies" section.
+homepage: https://getforgeops.net
+topics:
+  - error-reporting
+  - logging
+  - monitoring
+  - observability
+
+environment:
+  # Kept in step with forge_ops_tracker's own >=3.2.0 floor: see that package's pubspec.yaml for
+  # why (Isolate.resolvePackageUriSync, used by its source context capture).
+  sdk: ">=3.2.0 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # A real pub.dev dependency, not a path dependency (pub.dev rejects those outright). A range, not
+  # a caret: for a 0.x version a caret allows only the same minor (^0.1.0 kept resolving to the very
+  # old 0.1.x base package, and ^0.7.1 would go stale at the next 0.8), and this package only calls
+  # init and captureException, which every 0.7.x has. Raise the floor if it starts needing more.
+  forge_ops_tracker: ">=0.7.1 <1.0.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^4.0.0
