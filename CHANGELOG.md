@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.1 (2026-10-22)
+
+- The README says what strict privacy does in its opening lines.
+- The source is public at https://github.com/Luke-Popwell/forge-ops-tracker-dart, and the package links to it.
+
 ## 0.17.0 (2026-10-20)
 
 - Strict privacy's path rule changed. A route template (`/patients/:id/notes`, `/patients/{id}`, `/files/*path`) is now kept exactly as it is, and a raw path keeps only its first segment, with the rest sent as `:path` (`/patients/jane-doe/12` is now `/patients/:path`; before, only segments holding a digit were replaced, so `jane-doe` went out). This applies to span names and performance transaction names. Nothing changes with strict privacy off.

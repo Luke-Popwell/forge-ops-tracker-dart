@@ -1,5 +1,5 @@
 name: forge_ops_tracker
-version: 0.17.0
+version: 0.17.1
 description: >
   Dart error reporting client for ForgeOps. Works in
   any Dart VM environment (server apps, CLI tools, Flutter mobile/desktop): see README.md for

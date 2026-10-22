@@ -11,7 +11,7 @@ to pull in the Flutter SDK.
 ```yaml
 # pubspec.yaml
 dependencies:
-  forge_ops_tracker: ^0.17.0
+  forge_ops_tracker: ^0.17.1
   flutter_forge_ops_tracker: ^0.2.0
 ```
 
