@@ -1,7 +1,35 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:forge_ops_tracker/forge_ops_tracker.dart';
 import 'package:test/test.dart';
 
+// A byte-identical copy of sdks/pii_scrubbing_vectors.json, generated from the server's own
+// app/services/pii_scrubber.rb: card numbers, IBANs and bank-detail keys, as sdks/PII_SCRUBBING.md
+// describes them.
+final File _fixture = File('test/fixtures/pii_scrubbing_vectors.json');
+final Map<String, Object?> _vectors = jsonDecode(_fixture.readAsStringSync()) as Map<String, Object?>;
+
+List<Map<String, Object?>> _entries(String key) => (_vectors[key] as List).cast<Map<String, Object?>>();
+
 void main() {
+  group('pii scrubbing vectors', () {
+    for (final vector in _entries('strings')) {
+      final input = vector['input']! as String;
+      test('scrubs ${jsonEncode(input)} exactly as the server does', () {
+        expect(scrub(input), vector['scrubbed']);
+      });
+    }
+
+    for (final vector in _entries('keys')) {
+      final key = vector['key']! as String;
+      test('redacts a value under ${jsonEncode(key)} exactly when the server does', () {
+        final scrubbed = scrub({key: 'x'})! as Map;
+        expect(scrubbed[key] == redacted, vector['redacted']);
+      });
+    }
+  });
+
   group('scrubString', () {
     test('scrubs an email address', () {
       expect(scrubString('contact user@example.com for help'), 'contact [EMAIL FILTERED] for help');

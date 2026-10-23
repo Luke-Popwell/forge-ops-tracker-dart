@@ -21,7 +21,7 @@ This directory holds two packages:
 ```yaml
 # pubspec.yaml
 dependencies:
-  forge_ops_tracker: ^0.18.0
+  forge_ops_tracker: ^0.19.0
   # Flutter apps only:
   flutter_forge_ops_tracker: ^0.2.0
 ```
