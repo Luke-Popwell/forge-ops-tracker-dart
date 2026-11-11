@@ -55,7 +55,11 @@ it's the same client underneath.
 Strict privacy is a core client setting, so it covers every error this package reports too. Turn it
 on in `init` (or with `FORGE_OPS_STRICT_PRIVACY=true`) and errors go out without their message (a
 `message_fingerprint` instead), breadcrumbs, SQL statement, source context or the user's email and
-username, with only the context and tag keys in `config.privacyAllowedFields`:
+username, with only the context and tag keys in `config.privacyAllowedFields`. The user's raw id
+isn't sent either: with `config.privacyUserKey` set it goes out as a keyed hash, and without a key
+no user is sent at all. The key ships inside your app, where anyone can read it out, so it protects
+the id less than on a server; to send no user at all from the app, leave the key unset (the
+default):
 
 ```dart
 forge_ops_tracker.init((config) {

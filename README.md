@@ -569,6 +569,7 @@ forge_ops_tracker.init((config) {
   config.dsn = '...';
   config.strictPrivacy = true;
   config.privacyAllowedFields = ['error_code', 'feature'];
+  config.privacyUserKey = Platform.environment['MY_FORGE_OPS_USER_KEY']; // default null: no user sent
 });
 ```
 
@@ -577,7 +578,13 @@ forge_ops_tracker.init((config) {
   numbers, ids, emails and quoted values taken out, computed in this process, so errors still group the same way.
 - No breadcrumbs (`addBreadcrumb` records nothing), no SQL statement (even with
   `captureSqlStatement` on; the table and view names are still sent), and no source context.
-- The user is sent as its `id` only, never `email` or `username`.
+- The user's `email` and `username` are never sent, and neither is the raw `id`. With
+  `privacyUserKey` set, the id is sent as a keyed hash (HMAC-SHA256 with your key, which never
+  leaves your app), so ForgeOps can still count affected customers but can't read the id. Without
+  a key, no user is sent at all. Keep the key the same across servers and deploys, or one customer
+  counts as two. In code that runs on users' devices, like a Flutter app, the key can be read out
+  of the app, so it protects the id less than on a server. To send no user at all from the app,
+  leave the key unset (the default).
 - Context and tags keep only the top-level keys listed in `privacyAllowedFields`, and only when the
   value is a string, number or bool. With none listed, neither is sent.
 - Traces: an `http` span is named by its method and host (`GET api.example.com`), a span named
@@ -593,9 +600,9 @@ The exception type, backtrace frames (file, line, function), release, environmen
 id are unchanged, as are performance aggregates, metrics and recorded changes. The same applies to
 errors `flutter_forge_ops_tracker` reports, since it reports through this client.
 
-Both options can also come from the environment: `FORGE_OPS_STRICT_PRIVACY=true` and
-`FORGE_OPS_PRIVACY_ALLOWED_FIELDS=error_code,feature` (comma separated). A value set in `init` wins
-over the environment.
+All three options can also come from the environment: `FORGE_OPS_STRICT_PRIVACY=true`,
+`FORGE_OPS_PRIVACY_ALLOWED_FIELDS=error_code,feature` (comma separated) and
+`FORGE_OPS_PRIVACY_USER_KEY=...`. A value set in `init` wins over the environment.
 
 ForgeOps applies the same rules again on arrival when the project's own Strict privacy setting is
 on, so an app running an older client, or one configured without this, still can't get text stored

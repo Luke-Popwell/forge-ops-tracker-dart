@@ -123,10 +123,10 @@ class Configuration {
 
   /// Strict privacy, for apps that can't let personal or health data leave this process: every
   /// error event goes out without its message (a `message_fingerprint` instead, so errors still
-  /// group), breadcrumbs, SQL statement, source context, or the user's email/username, and with
-  /// only the context/tag keys named in [privacyAllowedFields]. Breadcrumbs aren't recorded at all,
-  /// `http` spans are named by method and host only, and span data keeps only `db.statement` and
-  /// `db.system`. See `strict_privacy.dart`. Off by default; `FORGE_OPS_STRICT_PRIVACY=true` turns
+  /// group), breadcrumbs, SQL statement, source context, or the user's email/username, with the
+  /// user's id only as a keyed hash ([privacyUserKey]), and with only the context/tag keys named in
+  /// [privacyAllowedFields]. Breadcrumbs aren't recorded at all, `http` spans are named by method
+  /// and host only, and span data keeps only `db.statement` and `db.system`. See `strict_privacy.dart`. Off by default; `FORGE_OPS_STRICT_PRIVACY=true` turns
   /// it on, and a value set in `init` wins over the environment. ForgeOps applies the same rules
   /// again on arrival when the project's own Strict privacy setting is on.
   bool strictPrivacy = strict_privacy.envFlag(Platform.environment['FORGE_OPS_STRICT_PRIVACY']);
@@ -135,6 +135,13 @@ class Configuration {
   /// under these exact top-level keys), e.g. `['error_code', 'feature']`. Defaults to
   /// `FORGE_OPS_PRIVACY_ALLOWED_FIELDS`, comma separated, or none.
   List<String> privacyAllowedFields = strict_privacy.envList(Platform.environment['FORGE_OPS_PRIVACY_ALLOWED_FIELDS']);
+
+  /// Strict privacy sends the user's id only as a keyed hash (HMAC-SHA256) with this secret, which
+  /// stays in your app; unset (or empty), no user is sent at all. Keep it the same across deploys
+  /// and servers, or the same customer counts as two. In a Flutter app the key ships inside the app
+  /// and can be read out of it, so it protects the id less than on a server. Defaults to
+  /// `FORGE_OPS_PRIVACY_USER_KEY`, or none.
+  String? privacyUserKey = strict_privacy.envKey(Platform.environment['FORGE_OPS_PRIVACY_USER_KEY']);
 
   /// Called with a debug-level message on delivery failures; `null` (the default) discards them.
   void Function(String message)? logger;

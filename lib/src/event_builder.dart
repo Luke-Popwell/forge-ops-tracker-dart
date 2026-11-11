@@ -97,7 +97,7 @@ class EventBuilder {
     // is on), so it matches what the server fingerprints from a client without strict privacy, and
     // a message holding an email still groups as one.
     final fingerprint = strict_privacy.messageFingerprint(scrubbed['message'] as String?);
-    return strict_privacy.strictEvent(built, fingerprint, _configuration.privacyAllowedFields);
+    return strict_privacy.strictEvent(built, fingerprint, _configuration.privacyAllowedFields, _configuration.privacyUserKey);
   }
 
   // See sql_statement.dart for what's read off the error and how it's masked. The statement itself

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0 (2026-11-11)
+
+- Strict privacy no longer sends the user's raw `id`, which could be a record number that identifies a
+  person. Set `config.privacyUserKey` (or `FORGE_OPS_PRIVACY_USER_KEY`) and the id is sent as a keyed hash
+  (HMAC-SHA256 with your key, which never leaves your app), so affected customers are still counted.
+  Without a key, no user is sent at all. In a Flutter app the key ships inside the app and can be read
+  out of it, so it protects the id less than on a server.
+
 ## 0.19.0 (2026-10-23)
 
 - PII scrubbing catches card numbers however they're grouped (bare, 4-4-4-4, Amex's 4-6-5, or next to a

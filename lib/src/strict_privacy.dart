@@ -2,8 +2,8 @@
 /// leave their own process. Only structured facts about an error are sent (its type, its stack
 /// frames, release, environment, server, trace id, timings and counts), never free text that could
 /// carry a name, an email or a diagnosis: no message, breadcrumbs, SQL statement, source context,
-/// or user email/username, and only the context/tag keys listed in
-/// [Configuration.privacyAllowedFields]. Ported from the server's own
+/// or user email/username, the user's id only as a keyed hash ([Configuration.privacyUserKey]), and
+/// only the context/tag keys listed in [Configuration.privacyAllowedFields]. Ported from the server's own
 /// `app/services/strict_privacy.rb`, which applies the same rules again on arrival;
 /// `sdks/strict_privacy_vectors.json` pins the results both have to agree on.
 ///
@@ -57,11 +57,14 @@ String messageFingerprint(String? message) =>
     sha256Hex(utf8.encode(normalizeMessage(message))).substring(0, fingerprintLength);
 
 /// An error event's payload, reduced to what strict privacy keeps. [fingerprint] is computed from
-/// the message as it would otherwise have been sent (after PII scrubbing, when that's on).
-Map<String, Object?> strictEvent(Map<String, Object?> payload, String fingerprint, List<String> allowedFields) {
+/// the message as it would otherwise have been sent (after PII scrubbing, when that's on). The user
+/// goes out only as a keyed hash of its id ([hashedUserId]) under [userKey]
+/// ([Configuration.privacyUserKey]), and not at all without one.
+Map<String, Object?> strictEvent(Map<String, Object?> payload, String fingerprint, List<String> allowedFields,
+    [String? userKey]) {
   final context = _allowed(payload['context'], allowedFields);
   final tags = _allowed(payload['tags'], allowedFields);
-  final user = _userId(payload['user']);
+  final user = _userId(payload['user'], userKey);
   return {
     for (final entry in payload.entries)
       if (!_droppedEventFields.contains(entry.key)) entry.key: entry.value,
@@ -157,12 +160,35 @@ Map<String, Object?>? _allowed(Object? fields, List<String> allowedFields) {
   return kept.isEmpty ? null : kept;
 }
 
-Map<String, Object?>? _userId(Object? user) {
+// Only a keyed hash of the id, and only with a key: a raw id can be a record number that identifies
+// a person, and an unkeyed hash of a small number can be guessed back.
+Map<String, Object?>? _userId(Object? user, String? key) {
   if (user is! Map) return null;
+  if (key == null || key.isEmpty) return null;
   final id = user['id'];
   if (id == null || id == false || id.toString().trim().isEmpty) return null;
-  return {'id': id.toString()};
+  return {'id': hashedUserId(id, key)};
 }
+
+/// `h1:` and the first 32 lowercase hex characters of HMAC-SHA256 of the id's UTF-8 text, keyed
+/// with the app's own secret, which ForgeOps never sees. The same id hashes the same under one key,
+/// so affected customers can still be counted.
+String hashedUserId(Object id, String key) =>
+    'h1:${hmacSha256Hex(utf8.encode(key), utf8.encode(id.toString())).substring(0, fingerprintLength)}';
+
+/// HMAC-SHA256 (RFC 2104) on the self-contained [sha256Hex] below:
+/// `SHA256((K' xor opad) || SHA256((K' xor ipad) || message))`, with `K'` the key (or its SHA-256,
+/// when longer than 64 bytes) padded with zeros to 64 bytes.
+String hmacSha256Hex(List<int> key, List<int> message) {
+  final block = key.length > 64 ? _hexBytes(sha256Hex(key)) : [...key];
+  while (block.length < 64) {
+    block.add(0);
+  }
+  final inner = _hexBytes(sha256Hex([for (final byte in block) byte ^ 0x36, ...message]));
+  return sha256Hex([for (final byte in block) byte ^ 0x5c, ...inner]);
+}
+
+List<int> _hexBytes(String hex) => [for (var i = 0; i < hex.length; i += 2) int.parse(hex.substring(i, i + 2), radix: 16)];
 
 /// `FORGE_OPS_STRICT_PRIVACY`'s value as a bool: `true`, `1`, `yes` or `on` (any case) turn it on.
 bool envFlag(String? value) => const {'true', '1', 'yes', 'on'}.contains((value ?? '').trim().toLowerCase());
@@ -170,6 +196,9 @@ bool envFlag(String? value) => const {'true', '1', 'yes', 'on'}.contains((value 
 /// `FORGE_OPS_PRIVACY_ALLOWED_FIELDS`'s comma separated names, trimmed, blanks dropped.
 List<String> envList(String? value) =>
     (value ?? '').split(',').map((name) => name.trim()).where((name) => name.isNotEmpty).toList();
+
+/// `FORGE_OPS_PRIVACY_USER_KEY`'s value, or `null` when it's unset or empty.
+String? envKey(String? value) => value == null || value.isEmpty ? null : value;
 
 const List<int> _k = [
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, //

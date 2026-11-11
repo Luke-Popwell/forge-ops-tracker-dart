@@ -86,6 +86,25 @@ void main() {
           '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
       expect(sha256Hex(utf8.encode('a' * 1000)), '41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3');
     });
+
+    for (final vector in _entries('user_id')) {
+      test('user_id vector ${jsonEncode(vector['id'])} under ${jsonEncode(vector['key'])}', () {
+        expect(hashedUserId(vector['id'] as String, vector['key'] as String), vector['hashed']);
+      });
+    }
+
+    test('an integer user id hashes as its text', () {
+      expect(hashedUserId(42, 'customer-secret'), 'h1:316d4a35bc95112698f59ef5aac5c29a');
+    });
+
+    test("the self-contained HMAC-SHA256 matches RFC 4231's test cases, including a key over 64 bytes", () {
+      expect(hmacSha256Hex(List.filled(20, 0x0b), utf8.encode('Hi There')),
+          'b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7');
+      expect(hmacSha256Hex(utf8.encode('Jefe'), utf8.encode('what do ya want for nothing?')),
+          '5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843');
+      expect(hmacSha256Hex(List.filled(131, 0xaa), utf8.encode('Test Using Larger Than Block-Size Key - Hash Key First')),
+          '60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54');
+    });
   });
 
   group('EventBuilder with strict privacy', () {
@@ -106,7 +125,7 @@ void main() {
       expect(payload['sql_objects'], isNotNull);
       expect(payload['context'], {'error_code': 'E42'});
       expect(payload.containsKey('tags'), isFalse);
-      expect(payload['user'], {'id': '7'});
+      expect(payload.containsKey('user'), isFalse);
       expect(payload['trace_id'], 'a' * 32);
       expect(payload['exception_class'], '_SqlError');
       final frames = (payload['backtrace'] as List).cast<Map<String, Object?>>();
@@ -150,8 +169,33 @@ void main() {
       expect(_build(config)['message_fingerprint'], messageFingerprint("Couldn't find Patient with id=8821 (jane@example.com)"));
     });
 
+    test('sends the user as only the keyed hash of its id when privacyUserKey is set', () {
+      final config = _newConfiguration()
+        ..strictPrivacy = true
+        ..privacyUserKey = 'customer-secret';
+
+      final payload = _build(config);
+
+      expect(payload['user'], {'id': hashedUserId('7', 'customer-secret')});
+      expect((payload['user'] as Map)['id'], matches(RegExp(r'^h1:[0-9a-f]{32}$')));
+      expect(jsonEncode(payload), isNot(matches(RegExp('jane'))));
+    });
+
+    test('sends no user with an empty privacyUserKey, or with a key and a blank id', () {
+      final config = _newConfiguration()
+        ..strictPrivacy = true
+        ..privacyUserKey = '';
+      expect(_build(config).containsKey('user'), isFalse);
+
+      config.privacyUserKey = 'customer-secret';
+      final (error, stackTrace) = _throwAndCatch(_SqlError('boom', ''));
+      expect(EventBuilder(config).build(error, stackTrace, user: {'id': '  '}).containsKey('user'), isFalse);
+    });
+
     test('leaves context, tags and user out when nothing is allowed or there is no id', () {
-      final config = _newConfiguration()..strictPrivacy = true;
+      final config = _newConfiguration()
+        ..strictPrivacy = true
+        ..privacyUserKey = 'customer-secret';
       final (error, stackTrace) = _throwAndCatch(_SqlError('boom', ''));
 
       final payload = EventBuilder(config).build(error, stackTrace,
@@ -164,7 +208,9 @@ void main() {
     });
 
     test('with strict privacy off, events are exactly as before', () {
-      final config = _newConfiguration()..privacyAllowedFields = ['error_code']; // ignored while off
+      final config = _newConfiguration()
+        ..privacyAllowedFields = ['error_code'] // ignored while off
+        ..privacyUserKey = 'customer-secret';
 
       // Built from the same line, so the two backtraces are identical too.
       final [payload, untouched] = [config, _newConfiguration()].map(_build).toList();
@@ -181,13 +227,15 @@ void main() {
   });
 
   group('Configuration', () {
-    test('both options are off and empty by default', () {
+    test('all three options are off and empty by default', () {
       final config = Configuration();
       expect(config.strictPrivacy, isFalse);
       expect(config.privacyAllowedFields, isEmpty);
+      expect(config.privacyUserKey, isNull);
     },
         skip: Platform.environment.containsKey('FORGE_OPS_STRICT_PRIVACY') ||
-                Platform.environment.containsKey('FORGE_OPS_PRIVACY_ALLOWED_FIELDS')
+                Platform.environment.containsKey('FORGE_OPS_PRIVACY_ALLOWED_FIELDS') ||
+                Platform.environment.containsKey('FORGE_OPS_PRIVACY_USER_KEY')
             ? 'this shell sets the strict privacy environment variables'
             : false);
 
@@ -199,15 +247,25 @@ void main() {
       expect(envFlag(null), isFalse);
       expect(envList('error_code, feature,,'), ['error_code', 'feature']);
       expect(envList(null), isEmpty);
+      expect(envKey('customer-secret'), 'customer-secret');
+      expect(envKey(''), isNull);
+      expect(envKey(null), isNull);
     });
 
-    test('FORGE_OPS_STRICT_PRIVACY and FORGE_OPS_PRIVACY_ALLOWED_FIELDS set the defaults', () async {
+    test('FORGE_OPS_STRICT_PRIVACY, FORGE_OPS_PRIVACY_ALLOWED_FIELDS and FORGE_OPS_PRIVACY_USER_KEY set the defaults', () async {
       final result = await Process.run(Platform.resolvedExecutable, ['test/fixtures/strict_privacy_env_child.dart'],
           environment: {
         'FORGE_OPS_STRICT_PRIVACY': 'true',
         'FORGE_OPS_PRIVACY_ALLOWED_FIELDS': 'error_code,feature',
+        'FORGE_OPS_PRIVACY_USER_KEY': 'customer-secret',
       });
-      expect(result.stdout.toString().trim(), 'true [error_code, feature]', reason: result.stderr.toString());
+      expect(result.stdout.toString().trim(), 'true [error_code, feature] customer-secret', reason: result.stderr.toString());
+    });
+
+    test('an empty FORGE_OPS_PRIVACY_USER_KEY counts as unset', () async {
+      final result = await Process.run(Platform.resolvedExecutable, ['test/fixtures/strict_privacy_env_child.dart'],
+          environment: {'FORGE_OPS_STRICT_PRIVACY': 'true', 'FORGE_OPS_PRIVACY_USER_KEY': ''});
+      expect(result.stdout.toString().trim(), 'true [] null', reason: result.stderr.toString());
     });
   });
 
@@ -235,15 +293,34 @@ void main() {
       fot.resetForTesting();
     });
 
-    void configure({bool strict = true}) {
+    void configure({bool strict = true, String? userKey}) {
       fot.init((c) {
         c.dsn = 'http://key@localhost:${server.port}/api/v1/events';
         c.environment = 'production';
         c.strictPrivacy = strict;
         c.privacyAllowedFields = ['error_code'];
+        c.privacyUserKey = userKey;
         c.traceCaptureThreshold = Duration.zero;
       });
     }
+
+    test('captureException sends the user as only the keyed hash of its id with privacyUserKey set', () async {
+      configure(userKey: 'customer-secret');
+
+      fot.captureException(Exception('boom'), null, null, {'id': 42, 'email': 'jane@example.com'});
+      expect(await fot.flush(), isTrue);
+
+      expect(bodies.single['user'], {'id': 'h1:316d4a35bc95112698f59ef5aac5c29a'});
+    });
+
+    test('captureException sends no user with strict privacy on and no privacyUserKey', () async {
+      configure();
+
+      fot.captureException(Exception('boom'), null, null, {'id': 42});
+      expect(await fot.flush(), isTrue);
+
+      expect(bodies.single.containsKey('user'), isFalse);
+    });
 
     test('captureException sends no message or breadcrumbs, and breadcrumbs are not recorded', () async {
       configure();
